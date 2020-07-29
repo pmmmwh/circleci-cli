@@ -65,6 +65,33 @@ func toSlug(vcs, org string) *string {
 	return &slug
 }
 
+func (c *Client) DeleteEnvironmentVariable(contextID, variable string) error {
+	req, err := c.newDeleteEnvironmentVariableRequest(contextID, variable)
+	if err != nil {
+		return err
+	}
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return err
+	}
+
+	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	defer resp.Body.Close()
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode != 200 {
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return err
+		}
+		return errors.New(*dest.Message)
+	}
+	return nil
+}
+
 func (c *Client) CreateContext(vcs, org, name string) (*Context, error) {
 	req, err := c.newCreateContextRequest(vcs, org, name)
 	if err != nil {
@@ -309,6 +336,16 @@ func (c *Client) newCreateEnvironmentVariableRequest(contextID, variable, value 
 	bodyReader = bytes.NewReader(buf)
 
 	return c.newHTTPRequest("PUT", queryURL.String(), bodyReader)
+}
+
+func (c *Client) newDeleteEnvironmentVariableRequest(contextID, name string) (*http.Request, error) {
+	var err error
+	queryURL, err := url.Parse(c.server)
+	if err != nil {
+		return nil, err
+	}
+	queryURL, err = queryURL.Parse(fmt.Sprintf("context/%s/environment-variable/%s", contextID, name))
+	return c.newHTTPRequest("DELETE", queryURL.String(), nil)
 }
 
 func (c *Client) newDeleteContextRequest(contextID string) (*http.Request, error) {
